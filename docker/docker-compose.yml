@@ -1,0 +1,74 @@
+version: '3.5'
+
+services:
+    mysql8:
+        image: mysql:8
+        restart: always
+        environment:
+            MYSQL_ROOT_PASSWORD: root
+            MYSQL_DATABASE: xm_db
+            MYSQL_USER: user1
+            MYSQL_PASSWORD: pass1
+        volumes:
+            - ../../xm-vol/mysql8:/var/lib/mysql
+        networks:
+            - xm-network
+
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        restart: always
+        ports:
+            - "8080:80"
+        environment:
+            PMA_HOST: mysql8
+            PMA_PORT: 3306
+            MYSQL_ROOT_PASSWORD: root
+        depends_on:
+            - mysql8
+        networks:
+            - xm-network
+
+    redis:
+        image: "redis:latest"
+        restart: unless-stopped
+        ports:
+            - "5700:6379"
+        volumes:
+            - ../../xm-vol/redis:/data
+        networks:
+            - xm-network
+
+    mailhog:
+        image: mailhog/mailhog
+        ports:
+            - "1025:1025" # SMTP port
+            - "8025:8025" # Web UI port
+        volumes:
+            - ../../xm-vol/mailhog:/data  # Data volume for MailHog storage
+        networks:
+            - xm-network
+
+    xm-test-app:
+        build:
+            args:
+                user: dev
+                uid: 1000
+            context: .
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        ports:
+            - "8000:8000"
+        working_dir: /var/www/html
+        volumes:
+            - ../:/var/www/html
+        entrypoint: sh -c "chmod +x /var/www/html/docker/entrypoint.sh && /var/www/html/docker/entrypoint.sh"
+        depends_on:
+            - mysql8
+            - redis
+            - mailhog
+        networks:
+            - xm-network
+
+networks:
+    xm-network:
+        driver: bridge
